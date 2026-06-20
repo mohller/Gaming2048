@@ -3,14 +3,16 @@ import numpy as np
 def collapse(elements):
     """Takes a column/row of values and collapse them
     """
-    merge_points = [elements[k] == elements[k+1] for k in range(len(elements) - 1)] + [False, ]
-    keep = [False, ] + merge_points[:-1]
-
-    if np.any(merge_points):
-        out = [el+1 if match else el for el, match in zip(elements, merge_points)]
-        out = [el for el, kp in zip(out, keep) if not kp]
-    else:
-        out = elements
+    out, skip = [], False
+    for k in range(len(elements)):
+        if skip:
+            skip = False
+            continue
+        if k + 1 < len(elements) and elements[k] == elements[k + 1]:
+            out.append(elements[k] + 1)
+            skip = True
+        else:
+            out.append(elements[k])
     return out
 
 def operate(grid, direction=0):
@@ -39,6 +41,13 @@ def operate(grid, direction=0):
 
     return grid
     
+def is_game_over(grid):
+    """Returns True when the grid is full and no move changes it.
+    """
+    if np.any(grid == 0):
+        return False
+    return all(np.all(operate(grid, d) == grid) for d in range(4))
+
 def pop_next(grid):
     """Adds a new element of lowest value in a random 
        position, and modifies the grid to include it.
@@ -58,13 +67,13 @@ def generate_game(dim):
     initial = grid.copy()
 
     moves, pops = [], []
-    while np.any(grid == 0):
+    while not is_game_over(grid):
         nextgrid = grid.copy()
         while np.all(nextgrid == grid):
             dir = np.random.choice(range(4))
             nextgrid = operate(grid, dir)
-        
-        grid = nextgrid.copy()
+
+        grid = nextgrid
         moves.append(dir)
         
         grid = pop_next(grid)
@@ -74,12 +83,12 @@ def generate_game(dim):
 
     return initial, moves, pops
 
-def playback(initial, moves, pops, moments=[-1]):
+def playback(initial, moves, pops, moments=None):
     """Returns the status of the grid for the given moments.
     """
     grid = initial.copy()
 
-    if moments == [-1]:
+    if moments is None:
         moments = [len(moves) - 1]
 
     snapshots = []
@@ -91,3 +100,18 @@ def playback(initial, moves, pops, moments=[-1]):
             snapshots.append(grid)
 
     return snapshots
+
+def step(grid, direction):
+    """Apply one move and return (new_grid, reward, done, valid).
+
+    valid=False when the direction produced no change (illegal move).
+    reward is the increase in total tile value (log2 scale).
+    done=True when no further moves are possible.
+    """
+    new_grid = operate(grid, direction)
+    valid = not np.all(new_grid == grid)
+    if valid:
+        new_grid = pop_next(new_grid)
+    reward = int(np.sum(new_grid) - np.sum(grid))
+    done = is_game_over(new_grid)
+    return new_grid, reward, done, valid
