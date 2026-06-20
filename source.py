@@ -102,16 +102,14 @@ def playback(initial, moves, pops, moments=None):
     return snapshots
 
 def step(grid, direction):
-    """Apply one move and return (new_grid, reward, done, valid).
+    """Apply one move and return (new_grid, done, valid).
 
     valid=False when the direction produced no change (illegal move).
-    reward is the increase in total tile value (log2 scale).
     done=True when no further moves are possible.
     """
     new_grid = operate(grid, direction)
     valid = not np.all(new_grid == grid)
     if valid:
         new_grid = pop_next(new_grid)
-    reward = int(np.sum(new_grid) - np.sum(grid))
     done = is_game_over(new_grid)
-    return new_grid, reward, done, valid
+    return new_grid, done, valid
